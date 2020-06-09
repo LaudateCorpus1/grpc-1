@@ -8,6 +8,7 @@ defmodule GRPC.Adapter.Cowboy do
   alias GRPC.Adapter.Cowboy.Handler, as: Handler
 
   @default_num_acceptors 20
+  @default_max_connections 16384
 
   # Only used in starting a server manually using `GRPC.Server.start(servers)`
   @spec start(GRPC.Server.servers_map(), non_neg_integer, keyword) :: {:ok, pid, non_neg_integer}
@@ -134,11 +135,14 @@ defmodule GRPC.Adapter.Cowboy do
       ])
 
     idle_timeout = Keyword.get(opts, :idle_timeout, :infinity)
+    num_acceptors = Keyword.get(opts, :num_acceptors, @default_num_acceptors)
+    max_connections = Keyword.get(opts, :max_connections, @default_max_connections)
 
     [
       servers_name(servers),
       %{
-        num_acceptors: @default_num_acceptors,
+        num_acceptors: num_acceptors,
+        max_connections: max_connections,
         socket_opts: socket_opts(port, opts)
       },
       %{
