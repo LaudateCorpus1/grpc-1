@@ -31,8 +31,9 @@ defmodule GRPC.Server.Supervisor do
 
   @default_adapter GRPC.Adapter.Cowboy
 
-  def start_link(servers) do
-    Supervisor.start_link(__MODULE__, servers, name: __MODULE__)
+  def start_link(servers, opts \\ []) do
+    opts = if Keyword.get(opts, :name) == nil do Keyword.put(opts, :name, __MODULE__) else opts end
+    Supervisor.start_link(__MODULE__, servers, opts)
   end
 
   @spec init({module | [module], integer}) ::
