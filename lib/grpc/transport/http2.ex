@@ -6,8 +6,10 @@ defmodule GRPC.Transport.HTTP2 do
   alias GRPC.Transport.Utils
   alias GRPC.Status
 
+  @server_headers %{"content-type" => "application/grpc+proto"}
+
   def server_headers() do
-    %{"content-type" => "application/grpc+proto"}
+    @server_headers
   end
 
   @spec server_trailers(integer, String.t()) :: map
@@ -45,26 +47,23 @@ defmodule GRPC.Transport.HTTP2 do
 
   def extract_metadata(headers) do
     headers
-    |> Enum.filter(fn {k, _} -> is_metadata(k) end)
-    |> Enum.map(&decode_metadata/1)
-    |> Enum.into(%{})
+    |> Stream.filter(fn {k, _} -> is_metadata(k) end)
+    |> Enum.into(%{}, &decode_metadata/1)
   end
 
   def decode_headers(headers) do
-    headers
-    |> Enum.map(fn {k, v} ->
+    Enum.into(headers, fn {k, v} ->
       if is_metadata(k) do
         decode_metadata({k, v})
       else
         {k, v}
       end
     end)
-    |> Enum.into(%{})
   end
 
   def encode_metadata(metadata) do
     metadata
-    |> Enum.filter(fn {k, _v} -> !is_reserved_header(to_string(k)) end)
+    |> Stream.filter(fn {k, _v} -> !is_reserved_header(to_string(k)) end)
     |> Enum.reduce(%{}, fn {k, v}, acc ->
       {new_k, new_v} = encode_metadata_pair({k, v})
       Map.update(acc, new_k, new_v, fn old_v -> Enum.join([old_v, new_v], ",") end)

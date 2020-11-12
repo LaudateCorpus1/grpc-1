@@ -93,7 +93,9 @@ defmodule GRPC.Server do
          %{unmarshal: unmarshal, adapter: adapter} = stream,
          func_name
        ) do
+    #IO.puts("reading")
     {:ok, data} = adapter.read_body(stream.payload)
+    #IO.puts("done reading")
     message = GRPC.Message.from_data(data)
     request = unmarshal.(message)
     do_handle_request(req_stream, res_stream, stream, func_name, request)

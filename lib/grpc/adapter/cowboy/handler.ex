@@ -11,6 +11,7 @@ defmodule GRPC.Adapter.Cowboy.Handler do
   @adapter GRPC.Adapter.Cowboy
   @default_trailers HTTP2.server_trailers()
   @type state :: %{pid: pid, handling_timer: reference, resp_trailers: map}
+  @server_headers %{"content-type" => "application/grpc+proto"}
 
   @spec init(map, {GRPC.Server.servers_map(), map}) :: {:cowboy_loop, map, map}
   def init(req, {servers, opts} = state) do
@@ -25,10 +26,13 @@ defmodule GRPC.Adapter.Cowboy.Handler do
         local: opts[:local]
       }
 
+
+
       pid = spawn_link(__MODULE__, :call_rpc, [server, path, stream])
+      #IO.puts("init #{inspect pid}")
       Process.flag(:trap_exit, true)
 
-      req = :cowboy_req.set_resp_headers(HTTP2.server_headers(), req)
+      req = :cowboy_req.set_resp_headers(@server_headers, req)
 
       timeout = :cowboy_req.header("grpc-timeout", req)
 
@@ -40,6 +44,9 @@ defmodule GRPC.Adapter.Cowboy.Handler do
             GRPC.Transport.Utils.decode_timeout(timeout)
           )
         end
+
+      #{s, body, req} = read_full_body(req, "", timer_ref)
+      #IO.puts("body #{inspect body}")
 
       {:cowboy_loop, req, %{pid: pid, handling_timer: timer_ref}}
     else
@@ -190,6 +197,7 @@ defmodule GRPC.Adapter.Cowboy.Handler do
   end
 
   def terminate(reason, _req, %{pid: pid}) do
+    #IO.puts("terminate #{inspect pid}")
     exit_handler(pid, reason)
     :ok
   end
