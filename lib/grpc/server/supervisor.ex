@@ -32,7 +32,13 @@ defmodule GRPC.Server.Supervisor do
   @default_adapter GRPC.Adapter.Cowboy
 
   def start_link(servers, opts \\ []) do
-    opts = if Keyword.get(opts, :name) == nil do Keyword.put(opts, :name, __MODULE__) else opts end
+    opts =
+      if Keyword.get(opts, :name) == nil do
+        Keyword.put(opts, :name, __MODULE__)
+      else
+        opts
+      end
+
     Supervisor.start_link(__MODULE__, servers, opts)
   end
 

@@ -66,9 +66,19 @@ defmodule GRPC.Adapter.Cowboy do
     :cowboy.stop_listener(servers_name(servers))
   end
 
+  # TODO: why isn't this the full body??
   @spec read_body(GRPC.Adapter.Cowboy.Handler.state()) :: {:ok, binary}
-  def read_body(%{pid: pid}) do
-    Handler.read_full_body(pid)
+  def read_body(%{payload: req} = stream) do
+    {:ok, body, req} = read_full_body(req, "")
+    {:ok, body, %{stream | payload: req}}
+  end
+
+  defp read_full_body(req, body) do
+    # TODO: read timeout
+    case :cowboy_req.read_body(req) do
+      {:ok, data, req} -> {:ok, body <> data, req}
+      {:more, data, req} -> read_full_body(req, body <> data)
+    end
   end
 
   @spec reading_stream(GRPC.Adapter.Cowboy.Handler.state()) :: Enumerable.t()
@@ -104,24 +114,51 @@ defmodule GRPC.Adapter.Cowboy do
   end
 
   @spec send_reply(GRPC.Adapter.Cowboy.Handler.state(), binary) :: any
-  def send_reply(%{pid: pid}, data) do
-    Handler.stream_body(pid, data, :nofin)
+  def send_reply(%{payload: req}, data) do
+    :cowboy_req.stream_body(data, :nofin, req)
   end
 
-  def send_headers(%{pid: pid}, headers) do
-    Handler.stream_reply(pid, 200, headers)
+  def send_headers(%{payload: req} = stream, headers) do
+    req = :cowboy_req.stream_reply(200, headers, req)
+    %{stream | payload: req}
   end
 
-  def set_headers(%{pid: pid}, headers) do
-    Handler.set_resp_headers(pid, headers)
+  def has_sent_headers?(%{payload: req}) do
+    req[:has_sent_resp] != nil
   end
 
-  def set_resp_trailers(%{pid: pid}, trailers) do
-    Handler.set_resp_trailers(pid, trailers)
+  # TODO: why is this needed vs just set_resp_headers?
+  def set_headers(stream, headers) do
+    set_resp_headers(stream, headers)
   end
 
-  def send_trailers(%{pid: pid}, trailers) do
-    Handler.stream_trailers(pid, trailers)
+  def set_resp_headers(%{payload: req} = stream, headers) do
+    req = :cowboy_req.set_resp_headers(headers, req)
+    %{stream | payload: req}
+  end
+
+  def set_resp_trailers(stream, trailers) do
+    Map.put(stream, :resp_trailers, trailers)
+  end
+
+  def send_trailers(%{payload: req} = stream, trailers) do
+    metadata = Map.get(stream, :resp_trailers, %{})
+    metadata = GRPC.Transport.HTTP2.encode_metadata(metadata)
+    req = send_stream_trailers(req, Map.merge(metadata, trailers))
+    %{stream | payload: req}
+  end
+
+  defp send_stream_trailers(req, trailers) do
+    req = check_sent_resp(req)
+    :cowboy_req.stream_trailers(trailers, req)
+  end
+
+  defp check_sent_resp(%{has_sent_resp: _} = req) do
+    req
+  end
+
+  defp check_sent_resp(req) do
+    :cowboy_req.stream_reply(200, req)
   end
 
   def get_headers(%{pid: pid}) do

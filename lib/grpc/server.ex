@@ -93,9 +93,9 @@ defmodule GRPC.Server do
          %{unmarshal: unmarshal, adapter: adapter} = stream,
          func_name
        ) do
-    #IO.puts("reading")
-    {:ok, data} = adapter.read_body(stream.payload)
-    #IO.puts("done reading")
+    # IO.puts("reading")
+    {:ok, data, stream} = adapter.read_body(stream)
+    # IO.puts("done reading")
     message = GRPC.Message.from_data(data)
     request = unmarshal.(message)
     do_handle_request(req_stream, res_stream, stream, func_name, request)
@@ -108,7 +108,7 @@ defmodule GRPC.Server do
          func_name
        ) do
     reading_stream =
-      adapter.reading_stream(stream.payload)
+      adapter.reading_stream(stream)
       |> Elixir.Stream.map(&unmarshal.(&1))
 
     do_handle_request(req_stream, res_stream, stream, func_name, reading_stream)
@@ -190,8 +190,13 @@ defmodule GRPC.Server do
   """
   @spec send_reply(Stream.t(), struct) :: Stream.t()
   def send_reply(%{adapter: adapter, marshal: marshal} = stream, reply) do
+    stream = if adapter.has_sent_headers?(stream) do
+      stream
+    else
+      send_headers(stream, %{})
+    end
     {:ok, data, _size} = reply |> marshal.() |> GRPC.Message.to_data(%{iolist: true})
-    adapter.send_reply(stream.payload, data)
+    adapter.send_reply(stream, data)
     stream
   end
 
@@ -202,8 +207,7 @@ defmodule GRPC.Server do
   """
   @spec send_headers(Stream.t(), map) :: Stream.t()
   def send_headers(%{adapter: adapter} = stream, headers) do
-    adapter.send_headers(stream.payload, headers)
-    stream
+    adapter.send_headers(stream, headers)
   end
 
   @doc """
@@ -213,8 +217,7 @@ defmodule GRPC.Server do
   """
   @spec set_headers(Stream.t(), map) :: Stream.t()
   def set_headers(%{adapter: adapter} = stream, headers) do
-    adapter.set_headers(stream.payload, headers)
-    stream
+    adapter.set_headers(stream, headers)
   end
 
   @doc """
@@ -222,14 +225,12 @@ defmodule GRPC.Server do
   """
   @spec set_trailers(Stream.t(), map) :: Stream.t()
   def set_trailers(%{adapter: adapter} = stream, trailers) do
-    adapter.set_resp_trailers(stream.payload, trailers)
-    stream
+    adapter.set_resp_trailers(stream, trailers)
   end
 
   @doc false
   def send_trailers(%{adapter: adapter} = stream, trailers) do
-    adapter.send_trailers(stream.payload, trailers)
-    stream
+    adapter.send_trailers(stream, trailers)
   end
 
   @doc false
