@@ -74,7 +74,6 @@ defmodule GRPC.Adapter.Cowboy do
   end
 
   defp read_full_body(req, body) do
-    # TODO: read timeout
     case :cowboy_req.read_body(req) do
       {:ok, data, req} -> {:ok, body <> data, req}
       {:more, data, req} -> read_full_body(req, body <> data)
@@ -116,7 +115,7 @@ defmodule GRPC.Adapter.Cowboy do
 
   @spec send_reply(GRPC.Adapter.Cowboy.Handler.state(), binary) :: any
   def send_reply(%{payload: req}, data) do
-    :cowboy_req.stream_body(data, :nofin, req)
+    req = :cowboy_req.stream_body(data, :nofin, req)
   end
 
   def send_headers(%{payload: req} = stream, headers) do
