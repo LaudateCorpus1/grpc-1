@@ -81,6 +81,7 @@ defmodule GRPC.Adapter.Cowboy do
     end
   end
 
+  # TODO: need to support streaming
   @spec reading_stream(GRPC.Adapter.Cowboy.Handler.state()) :: Enumerable.t()
   def reading_stream(%{pid: pid}) do
     Stream.unfold(%{pid: pid, need_more: true, buffer: <<>>}, fn acc -> read_stream(acc) end)
