@@ -161,8 +161,8 @@ defmodule GRPC.Adapter.Cowboy do
     :cowboy_req.stream_reply(200, req)
   end
 
-  def get_headers(%{pid: pid}) do
-    Handler.get_headers(pid)
+  def get_headers(%{payload: req}) do
+    :cowboy_req.headers(req)
   end
 
   defp cowboy_start_args(servers, port, opts) do

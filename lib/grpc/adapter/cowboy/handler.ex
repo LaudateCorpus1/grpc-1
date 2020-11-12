@@ -80,38 +80,29 @@ defmodule GRPC.Adapter.Cowboy.Handler do
   #  sync_call(pid, :read_body)
   #end
 
-  def stream_body(pid, data, is_fin) do
-    send(pid, {:stream_body, data, is_fin})
-  end
+  #def stream_body(pid, data, is_fin) do
+  #  send(pid, {:stream_body, data, is_fin})
+  #end
 
-  def stream_reply(pid, status, headers) do
-    send(pid, {:stream_reply, status, headers})
-  end
+  #def stream_reply(pid, status, headers) do
+  #  send(pid, {:stream_reply, status, headers})
+  #end
 
-  def set_resp_headers(pid, headers) do
-    send(pid, {:set_resp_headers, headers})
-  end
+  #def set_resp_headers(pid, headers) do
+  #  send(pid, {:set_resp_headers, headers})
+  #end
 
-  def set_resp_trailers(pid, trailers) do
-    send(pid, {:set_resp_trailers, trailers})
-  end
+  #def set_resp_trailers(pid, trailers) do
+  #  send(pid, {:set_resp_trailers, trailers})
+  #end
 
-  def stream_trailers(pid, trailers) do
-    send(pid, {:stream_trailers, trailers})
-  end
+  #def stream_trailers(pid, trailers) do
+  #  send(pid, {:stream_trailers, trailers})
+  #end
 
-  def get_headers(pid) do
-    sync_call(pid, :get_headers)
-  end
-
-  defp sync_call(pid, key) do
-    ref = make_ref()
-    send(pid, {key, ref, self()})
-
-    receive do
-      {^ref, msg} -> msg
-    end
-  end
+  #def get_headers(pid) do
+  #  sync_call(pid, :get_headers)
+  #end
 
   # APIs end
 
@@ -138,22 +129,22 @@ defmodule GRPC.Adapter.Cowboy.Handler do
   #  end
   #end
 
-  def info({:get_headers, ref, pid}, req, state) do
-    headers = :cowboy_req.headers(req)
-    send(pid, {ref, headers})
-    {:ok, req, state}
-  end
+  #def info({:get_headers, ref, pid}, req, state) do
+  #  headers = :cowboy_req.headers(req)
+  #  send(pid, {ref, headers})
+  #  {:ok, req, state}
+  #end
 
-  def info({:stream_body, data, is_fin}, req, state) do
-    req = check_sent_resp(req)
-    :cowboy_req.stream_body(data, is_fin, req)
-    {:ok, req, state}
-  end
+  #def info({:stream_body, data, is_fin}, req, state) do
+  #  req = check_sent_resp(req)
+  #  :cowboy_req.stream_body(data, is_fin, req)
+  #  {:ok, req, state}
+  #end
 
-  def info({:stream_reply, status, headers}, req, state) do
-    req = :cowboy_req.stream_reply(status, headers, req)
-    {:ok, req, state}
-  end
+  #def info({:stream_reply, status, headers}, req, state) do
+  #  req = :cowboy_req.stream_reply(status, headers, req)
+  #  {:ok, req, state}
+  #end
 
   #def info({:set_resp_headers, headers}, req, state) do
   #  req = :cowboy_req.set_resp_headers(headers, req)
@@ -251,18 +242,18 @@ defmodule GRPC.Adapter.Cowboy.Handler do
   #  end
   #end
 
-  defp send_stream_trailers(req, trailers) do
-    req = check_sent_resp(req)
-    :cowboy_req.stream_trailers(trailers, req)
-  end
+  #defp send_stream_trailers(req, trailers) do
+  #  req = check_sent_resp(req)
+  #  :cowboy_req.stream_trailers(trailers, req)
+  #end
 
-  defp check_sent_resp(%{has_sent_resp: _} = req) do
-    req
-  end
+  #defp check_sent_resp(%{has_sent_resp: _} = req) do
+  #  req
+  #end
 
-  defp check_sent_resp(req) do
-    :cowboy_req.stream_reply(200, req)
-  end
+  #defp check_sent_resp(req) do
+  #  :cowboy_req.stream_reply(200, req)
+  #end
 
   defp send_error_trailers(%{has_sent_resp: _} = req, trailers) do
     :cowboy_req.stream_trailers(trailers, req)
