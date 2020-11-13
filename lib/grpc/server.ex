@@ -188,11 +188,13 @@ defmodule GRPC.Server do
   """
   @spec send_reply(Stream.t(), struct) :: Stream.t()
   def send_reply(%{adapter: adapter, marshal: marshal} = stream, reply) do
-    stream = if adapter.has_sent_headers?(stream) do
-      stream
-    else
-      send_headers(stream, %{})
-    end
+    stream =
+      if adapter.has_sent_headers?(stream) do
+        stream
+      else
+        send_headers(stream, %{})
+      end
+
     {:ok, data, _size} = reply |> marshal.() |> GRPC.Message.to_data(%{iolist: true})
     adapter.send_reply(stream, data)
     stream

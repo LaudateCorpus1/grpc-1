@@ -28,17 +28,24 @@ defmodule GRPC.Adapter.Cowboy.Handler do
 
       stream = @adapter.set_headers(stream, HTTP2.server_headers())
 
-      case server.__call_rpc__(path, stream) do
-        {:ok, stream, response} ->
-          stream =
-            stream
-            |> GRPC.Server.send_reply(response)
-            |> GRPC.Server.send_trailers(@default_trailers)
+      try do
+        case server.__call_rpc__(path, stream) do
+          {:ok, stream, response} ->
+            stream =
+              stream
+              |> GRPC.Server.send_reply(response)
+              |> GRPC.Server.send_trailers(@default_trailers)
 
-          {:ok, stream.payload, state}
+            {:ok, stream.payload, state}
 
-        {:ok, stream} ->
-          stream = GRPC.Server.send_trailers(stream, @default_trailers)
+          {:ok, stream} ->
+            stream = GRPC.Server.send_trailers(stream, @default_trailers)
+            {:ok, stream.payload, state}
+        end
+      rescue
+        error in RPCError ->
+          trailers = HTTP2.server_trailers(error.status, error.message)
+          send_error_trailers(req, trailers)
           {:ok, stream.payload, state}
       end
 
@@ -72,41 +79,41 @@ defmodule GRPC.Adapter.Cowboy.Handler do
   end
 
   # APIs begin
-  #def read_full_body(pid) do
+  # def read_full_body(pid) do
   #  sync_call(pid, :read_full_body)
-  #end
+  # end
 
-  #def read_body(pid) do
+  # def read_body(pid) do
   #  sync_call(pid, :read_body)
-  #end
+  # end
 
-  #def stream_body(pid, data, is_fin) do
+  # def stream_body(pid, data, is_fin) do
   #  send(pid, {:stream_body, data, is_fin})
-  #end
+  # end
 
-  #def stream_reply(pid, status, headers) do
+  # def stream_reply(pid, status, headers) do
   #  send(pid, {:stream_reply, status, headers})
-  #end
+  # end
 
-  #def set_resp_headers(pid, headers) do
+  # def set_resp_headers(pid, headers) do
   #  send(pid, {:set_resp_headers, headers})
-  #end
+  # end
 
-  #def set_resp_trailers(pid, trailers) do
+  # def set_resp_trailers(pid, trailers) do
   #  send(pid, {:set_resp_trailers, trailers})
-  #end
+  # end
 
-  #def stream_trailers(pid, trailers) do
+  # def stream_trailers(pid, trailers) do
   #  send(pid, {:stream_trailers, trailers})
-  #end
+  # end
 
-  #def get_headers(pid) do
+  # def get_headers(pid) do
   #  sync_call(pid, :get_headers)
-  #end
+  # end
 
   # APIs end
 
-  #def info({:read_full_body, ref, pid}, req, state) do
+  # def info({:read_full_body, ref, pid}, req, state) do
   #  try do
   #    {s, body, req} = read_full_body(req, "", state[:handling_timer])
   #    send(pid, {ref, {s, body}})
@@ -115,9 +122,9 @@ defmodule GRPC.Adapter.Cowboy.Handler do
   #    :exit, :timeout ->
   #      info({:handling_timeout, self()}, req, state)
   #  end
-  #end
+  # end
 
-  #def info({:read_body, ref, pid}, req, state) do
+  # def info({:read_body, ref, pid}, req, state) do
   #  try do
   #    opts = timeout_left_opt(state[:handling_timer])
   #    {s, body, req} = :cowboy_req.read_body(req, opts)
@@ -127,87 +134,87 @@ defmodule GRPC.Adapter.Cowboy.Handler do
   #    :exit, :timeout ->
   #      info({:handling_timeout, self()}, req, state)
   #  end
-  #end
+  # end
 
-  #def info({:get_headers, ref, pid}, req, state) do
+  # def info({:get_headers, ref, pid}, req, state) do
   #  headers = :cowboy_req.headers(req)
   #  send(pid, {ref, headers})
   #  {:ok, req, state}
-  #end
+  # end
 
-  #def info({:stream_body, data, is_fin}, req, state) do
+  # def info({:stream_body, data, is_fin}, req, state) do
   #  req = check_sent_resp(req)
   #  :cowboy_req.stream_body(data, is_fin, req)
   #  {:ok, req, state}
-  #end
+  # end
 
-  #def info({:stream_reply, status, headers}, req, state) do
+  # def info({:stream_reply, status, headers}, req, state) do
   #  req = :cowboy_req.stream_reply(status, headers, req)
   #  {:ok, req, state}
-  #end
+  # end
 
-  #def info({:set_resp_headers, headers}, req, state) do
+  # def info({:set_resp_headers, headers}, req, state) do
   #  req = :cowboy_req.set_resp_headers(headers, req)
   #  {:ok, req, state}
-  #end
+  # end
 
-  #def info({:set_resp_trailers, trailers}, req, state) do
+  # def info({:set_resp_trailers, trailers}, req, state) do
   #  {:ok, req, Map.put(state, :resp_trailers, trailers)}
-  #end
+  # end
 
-  #def info({:stream_trailers, trailers}, req, state) do
+  # def info({:stream_trailers, trailers}, req, state) do
   #  metadata = Map.get(state, :resp_trailers, %{})
   #  metadata = GRPC.Transport.HTTP2.encode_metadata(metadata)
   #  send_stream_trailers(req, Map.merge(metadata, trailers))
   #  {:ok, req, state}
-  #end
+  # end
 
-  #def info({:handling_timeout, _}, req, state = %{pid: pid}) do
+  # def info({:handling_timeout, _}, req, state = %{pid: pid}) do
   #  error = %RPCError{status: GRPC.Status.deadline_exceeded(), message: "Deadline expired"}
   #  trailers = HTTP2.server_trailers(error.status, error.message)
   #  exit_handler(pid, :timeout)
   #  req = send_error_trailers(req, trailers)
   #  {:stop, req, state}
-  #end
+  # end
 
-  #def info({:EXIT, pid, :normal}, req, state = %{pid: pid}) do
+  # def info({:EXIT, pid, :normal}, req, state = %{pid: pid}) do
   #  exit_handler(pid, :normal)
   #  {:stop, req, state}
-  #end
+  # end
 
   # expected error raised from user to return error immediately
-  #def info({:EXIT, pid, {%RPCError{} = error, _stacktrace}}, req, state = %{pid: pid}) do
+  # def info({:EXIT, pid, {%RPCError{} = error, _stacktrace}}, req, state = %{pid: pid}) do
   #  trailers = HTTP2.server_trailers(error.status, error.message)
   #  exit_handler(pid, :rpc_error)
   #  req = send_error_trailers(req, trailers)
   #  {:stop, req, state}
-  #end
+  # end
 
   ## unknown error raised from rpc
-  #def info({:EXIT, pid, {:handle_error, _kind}}, req, state = %{pid: pid}) do
+  # def info({:EXIT, pid, {:handle_error, _kind}}, req, state = %{pid: pid}) do
   #  error = %RPCError{status: GRPC.Status.unknown(), message: "Internal Server Error"}
   #  trailers = HTTP2.server_trailers(error.status, error.message)
   #  exit_handler(pid, :error)
   #  req = send_error_trailers(req, trailers)
   #  {:stop, req, state}
-  #end
+  # end
 
-  #def info({:EXIT, pid, {reason, stacktrace}}, req, state = %{pid: pid}) do
+  # def info({:EXIT, pid, {reason, stacktrace}}, req, state = %{pid: pid}) do
   #  Logger.error(Exception.format(:error, reason, stacktrace))
   #  error = %RPCError{status: GRPC.Status.unknown(), message: "Internal Server Error"}
   #  trailers = HTTP2.server_trailers(error.status, error.message)
   #  exit_handler(pid, reason)
   #  req = send_error_trailers(req, trailers)
   #  {:stop, req, state}
-  #end
+  # end
 
-  #def terminate(reason, _req, %{pid: pid}) do
+  # def terminate(reason, _req, %{pid: pid}) do
   #  # IO.puts("terminate #{inspect pid}")
   #  exit_handler(pid, reason)
   #  :ok
-  #end
+  # end
 
-  #def call_rpc(server, path, stream) do
+  # def call_rpc(server, path, stream) do
   #  try do
   #    do_call_rpc(server, path, stream)
   #  rescue
@@ -218,9 +225,9 @@ defmodule GRPC.Adapter.Cowboy.Handler do
   #      Logger.error(Exception.format(kind, e))
   #      exit({:handle_error, kind})
   #  end
-  #end
+  # end
 
-  #defp do_call_rpc(server, path, stream) do
+  # defp do_call_rpc(server, path, stream) do
   #  case server.__call_rpc__(path, stream) do
   #    {:ok, stream, response} ->
   #      stream
@@ -233,27 +240,27 @@ defmodule GRPC.Adapter.Cowboy.Handler do
   #      GRPC.Server.send_trailers(stream, @default_trailers)
   #      {:ok, stream}
   #  end
-  #end
+  # end
 
-  #defp read_full_body(req, body, timer) do
+  # defp read_full_body(req, body, timer) do
   #  case :cowboy_req.read_body(req, timeout_left_opt(timer)) do
   #    {:ok, data, req} -> {:ok, body <> data, req}
   #    {:more, data, req} -> read_full_body(req, body <> data, timer)
   #  end
-  #end
+  # end
 
-  #defp send_stream_trailers(req, trailers) do
+  # defp send_stream_trailers(req, trailers) do
   #  req = check_sent_resp(req)
   #  :cowboy_req.stream_trailers(trailers, req)
-  #end
+  # end
 
-  #defp check_sent_resp(%{has_sent_resp: _} = req) do
+  # defp check_sent_resp(%{has_sent_resp: _} = req) do
   #  req
-  #end
+  # end
 
-  #defp check_sent_resp(req) do
+  # defp check_sent_resp(req) do
   #  :cowboy_req.stream_reply(200, req)
-  #end
+  # end
 
   defp send_error_trailers(%{has_sent_resp: _} = req, trailers) do
     :cowboy_req.stream_trailers(trailers, req)
@@ -263,13 +270,13 @@ defmodule GRPC.Adapter.Cowboy.Handler do
     :cowboy_req.reply(200, trailers, req)
   end
 
-  #def exit_handler(pid, reason) do
+  # def exit_handler(pid, reason) do
   #  if Process.alive?(pid) do
   #    Process.exit(pid, reason)
   #  end
-  #end
+  # end
 
-  #defp timeout_left_opt(timer, opts \\ %{}) do
+  # defp timeout_left_opt(timer, opts \\ %{}) do
   #  case timer do
   #    nil ->
   #      opts
@@ -283,5 +290,5 @@ defmodule GRPC.Adapter.Cowboy.Handler do
   #          0
   #      end
   #  end
-  #end
+  # end
 end
