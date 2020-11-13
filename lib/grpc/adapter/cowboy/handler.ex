@@ -47,6 +47,13 @@ defmodule GRPC.Adapter.Cowboy.Handler do
           trailers = HTTP2.server_trailers(error.status, error.message)
           send_error_trailers(req, trailers)
           {:ok, stream.payload, state}
+      catch
+        kind, e ->
+          Logger.error(Exception.format(kind, e))
+          error = %GRPC.RPCError{status: GRPC.Status.unknown(), message: "Internal Server Error"}
+          trailers = HTTP2.server_trailers(error.status, error.message)
+          send_error_trailers(req, trailers)
+          {:ok, stream.payload, state}
       end
 
       # pid = spawn_link(__MODULE__, :call_rpc, [server, path, stream])
